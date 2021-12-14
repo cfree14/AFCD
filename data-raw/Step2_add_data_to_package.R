@@ -19,10 +19,3 @@ afcd_refs <- readRDS(file=file.path(outdir, "AFCD_reference_key.Rds"))
 # Export data
 usethis::use_data(afcd, overwrite = T)
 usethis::use_data(afcd_refs, overwrite = T)
-
-
-
-
-
-
-

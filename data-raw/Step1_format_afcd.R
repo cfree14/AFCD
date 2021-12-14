@@ -154,6 +154,9 @@ nutr_key_orig <- data1 %>%
 # Export for formatting outside R
 write.csv(nutr_key_orig, file.path(indir, "AFCD_nutrient_key_work.csv"), row.names = F)
 
+# Read formatted key
+nutr_key_use <- readxl::read_excel(file.path(indir, "AFCD_nutrient_key_work.xlsx"))
+
 
 # Step 3. Format data
 ################################################################################
@@ -174,13 +177,37 @@ data2 <- data1 %>%
   mutate(food_prep=gsub("_", " ",  food_prep)) %>%
   # Format production category
   mutate(prod_catg=gsub("_", " ",  prod_catg)) %>%
-  # Add nutrient info
-  left_join(nutr_key, by=c("nutrient"="nutrient_orig")) %>%
+  # Format I30
+  # BNG = may be West Bengal
+  # GRB
+  mutate(iso3=stringr::str_trim(iso3),
+         iso3=ifelse(iso3=="", "Not provided", iso3),
+         iso3=recode(iso3,
+                     "SAu"="SAU",
+                     "BNG"="IND", # West Bengal which is part of India - study 1407
+                     "GRB"="GBR", # study 789 mis-recorded
+                     "KHG"="ITA", # study 338 mis-recorded
+                     "MYL"="MYS", # study 1438 mis-recorded
+                     "PNDB"="Pacific Region",
+                     "smiling_cambodia"="KHM",
+                     "smiling_indonesia"="IDN",
+                     "smiling_laos"="LAO",
+                     "smiling_thailand"="THA",
+                     "smiling_vietnam"="VNM",
+                     "unknown (Caspian Sea)"="Caspian Sea",
+                     "unknown"="Unknown",
+                     "POL/ AUS"="POL, AUS",
+                     "FAO.biodiv3"="FAO Biodiv 3",
+                     "FAO.infoods.ufish1"="FAO Infoods Ufish",
+                     "FAO.infoods.west.africa"="FAO West Africa",
+                     "FAO.latinfoods"="FAO Latin America")) %>%
+  # Add nutrients
+  left_join(nutr_key_use %>% select(nutrient_orig, nutrient, description, units), by=c("nutrient_orig")) %>%
   # Arrange
   select(sciname:taxa_db,
          study_id, peer_review, iso3, fao3,
-         prod_catg, food_part, food_prep, food_name, food_name_orig, notes,
-         nutrient, description, fao_code, units, value, everything())
+         prod_catg, food_part, food_prep, food_name, food_name_orig, fct_code_orig, food_id, edible_prop, notes,
+         nutrient_orig, nutrient, description, units, value, everything())
 
 
 # Step 4. Inspect data
@@ -228,7 +255,7 @@ sort(unique(data2$food_name_orig))
 
 
 # Inspect countries
-contry_key <- data1 %>%
+country_key <- data2 %>%
   # Unique ISOs
   select(iso3) %>%
   unique() %>%
@@ -248,7 +275,7 @@ spp_key <- data2 %>%
   ungroup() %>%
   # Recode species
   rename(sciname_orig=sciname) %>%
-  mutate(sciname=)
+  mutate(sciname=sciname_orig)
 
 # Check names
 # wrong_names1 <- freeR::check_names(spp_key$sciname)
