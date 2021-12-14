@@ -89,35 +89,7 @@ freeR::complete(ref_key)
 saveRDS(ref_key, file.path(outdir, "AFCD_reference_key.Rds"))
 
 
-# Nutrient key
-################################################################################
-
-# Build column key
-col_key <- col_key_orig %>%
-  # Rename
-  janitor::clean_names() %>%
-  rename(col_id=x1, col_name=afcd_variable_name, units=unit, fao_code=fao_tagname_if_applicable)
-
-# Build nutrient key
-nutr_key <- col_key %>%
-  # Simplify
-  select(-col_id) %>%
-  # Reduce to nutrients
-  filter(units!="none" | is.na(units)) %>%
-  # Rename
-  rename(nutrient_orig=col_name) %>%
-  # Format
-  mutate(nutrient_orig=tolower(nutrient_orig)) %>%
-  # Add nutrient column
-  mutate(nutrient=stringr::str_to_title(nutrient_orig) %>% gsub("_", " ", .)) %>%
-  # Arrange
-  select(nutrient_orig, nutrient, units, fao_code, description)
-
-
-
-
-
-# Format data
+# Step 1. Rename columns and go from wide to long
 ################################################################################
 
 # Format data
@@ -133,24 +105,58 @@ data1 <- data_orig %>%
          iso3=country_iso3,
          fao3=fao_3a_code,
          fct_code_orig=original_fct_food_code,
+         food_id=food_item_id,
          food_name=food_name_in_english,
          food_name_orig=food_name_in_original_language) %>%
   # Arrange
-  select(sciname:food_name_orig, notes, everything()) %>%
-  # Gather
-  gather(key="nutrient", value="value", 22:ncol(.)) %>%
+  select(sciname:food_name_orig, food_id, notes, everything()) %>%
+  # Gather nutrients (maintain capitalization)
+  gather(key="nutrient_orig", value="value", 23:ncol(.)) %>%
+  mutate(nutrient_orig=stringr::str_to_sentence(nutrient_orig)) %>%
   # Reduce to rows with data
   filter(!is.na(value))
 
-# Inspect countries
-contry_key <- data1 %>%
-  # Unique ISOs
-  select(iso3) %>%
+
+# Step 2. Build nutrient key
+################################################################################
+
+# Build column key
+col_key <- col_key_orig %>%
+  # Rename
+  janitor::clean_names() %>%
+  rename(col_id=x1, col_name=afcd_variable_name, units=unit, fao_code=fao_tagname_if_applicable)
+
+# Build nutrient key
+nutr_col_key <- col_key %>%
+  # Simplify
+  select(-col_id) %>%
+  # Reduce to nutrients
+  filter(units!="none" | is.na(units)) %>%
+  # Rename
+  rename(nutrient_orig=col_name) %>%
+  # Arrange
+  select(nutrient_orig, units, fao_code, description) %>%
+  unique()
+
+# Identify nutrients in data
+nutr_key_orig <- data1 %>%
+  # Identify nutrients in dataset
+  select(nutrient_orig) %>%
   unique() %>%
-  # Add country
-  mutate(country=countrycode::countrycode(iso3, "iso3c", "country.name")) %>%
-  # Sort
-  arrange(iso3)
+  arrange(nutrient_orig) %>%
+  # Add known meta-data from column key
+  left_join(nutr_col_key, by="nutrient_orig") %>%
+  # Format nutrient name
+  mutate(nutrient=nutrient_orig %>% gsub("_", " ", .)) %>%
+  # Arrange
+  select(nutrient_orig, nutrient, units, description, everything())
+
+# Export for formatting outside R
+write.csv(nutr_key_orig, file.path(indir, "AFCD_nutrient_key_work.csv"), row.names = F)
+
+
+# Step 3. Format data
+################################################################################
 
 # Format data some more
 data2 <- data1 %>%
@@ -176,6 +182,9 @@ data2 <- data1 %>%
          prod_catg, food_part, food_prep, food_name, food_name_orig, notes,
          nutrient, description, fao_code, units, value, everything())
 
+
+# Step 4. Inspect data
+################################################################################
 
 # Inspect
 str(data2)
@@ -217,6 +226,16 @@ sort(unique(data2$fct_code_orig))
 sort(unique(data2$food_name))
 sort(unique(data2$food_name_orig))
 
+
+# Inspect countries
+contry_key <- data1 %>%
+  # Unique ISOs
+  select(iso3) %>%
+  unique() %>%
+  # Add country
+  mutate(country=countrycode::countrycode(iso3, "iso3c", "country.name")) %>%
+  # Sort
+  arrange(iso3)
 
 # Species key
 ################################################################################
