@@ -2,7 +2,7 @@
 #'
 #' A cleaned version of the Aquatic Foods Composition Database (AFCD).
 #'
-#' @format A data frame with the following attributes::
+#' @format A data frame with the following attributes:
 #' \describe{
 #'   \item{sciname}{Scientific name}
 #'   \item{study_id}{Study id}
@@ -26,7 +26,7 @@
 #'
 #' Nutrient key for the Aquatic Foods Composition Database (AFCD).
 #'
-#' @format A data frame with the following attributes::
+#' @format A data frame with the following attributes:
 #' \describe{
 #'   \item{nutrient_type}{Nutrient type (e.g., mineral, vitamin, carbohydrate, etc.)}
 #'   \item{nutrient}{Nutrient name}
@@ -42,7 +42,7 @@
 #'
 #' Reference key for the Aquatic Foods Composition Database (AFCD). The AFCD utilizes a mixture of values from Food Composition Tables (FCTs) and from the peer-reviewed literature.
 #'
-#' @format A data frame with the following attributes::
+#' @format A data frame with the following attributes:
 #' \describe{
 #'   \item{study_type}{Study type (Peer-reviewed literature or FCT table)}
 #'   \item{study_id}{Study id}

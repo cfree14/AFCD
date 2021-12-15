@@ -5,7 +5,7 @@
 \alias{afcd_refs}
 \title{Aquatic Foods Composition Database (AFCD) reference key}
 \format{
-A data frame with the following attributes::
+A data frame with the following attributes:
 \describe{
   \item{study_type}{Study type (Peer-reviewed literature or FCT table)}
   \item{study_id}{Study id}

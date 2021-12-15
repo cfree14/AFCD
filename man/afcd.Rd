@@ -5,7 +5,7 @@
 \alias{afcd}
 \title{Aquatic Foods Composition Database (AFCD)}
 \format{
-A data frame with the following attributes::
+A data frame with the following attributes:
 \describe{
   \item{sciname}{Scientific name}
   \item{study_id}{Study id}

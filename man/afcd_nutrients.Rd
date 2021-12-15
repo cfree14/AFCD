@@ -5,7 +5,7 @@
 \alias{afcd_nutrients}
 \title{Aquatic Foods Composition Database (AFCD) nutrient key}
 \format{
-A data frame with the following attributes::
+A data frame with the following attributes:
 \describe{
   \item{nutrient_type}{Nutrient type (e.g., mineral, vitamin, carbohydrate, etc.)}
   \item{nutrient}{Nutrient name}
