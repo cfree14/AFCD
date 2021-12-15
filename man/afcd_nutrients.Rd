@@ -12,7 +12,7 @@ A data frame with the following attributes::
   \item{nutrient_units}{Nutrient units}
   \item{nutrient_code_fao}{FAO nutrient code}
   \item{nutrient_desc}{Description of nutrient and value}
-  \item{n}{Number of observations)}
+  \item{n}{Number of observations}
 }
 }
 \source{

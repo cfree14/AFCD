@@ -33,7 +33,7 @@
 #'   \item{nutrient_units}{Nutrient units}
 #'   \item{nutrient_code_fao}{FAO nutrient code}
 #'   \item{nutrient_desc}{Description of nutrient and value}
-#'   \item{n}{Number of observations)}
+#'   \item{n}{Number of observations}
 #' }
 #' @source Golden CD, Koehn JZ, Shepon A, Passarelli S, Free CM, Viana DF, Matthey H, Eurich JG, Gephart JA, Fluet-Chouinnard E, Nyboer EA, Lynch AJ, Kjellevold M, Bromage S, Charlebois P, Barange M, Vannuccini S, Cao L, Kleisner KM, Rimm EB, Danaei G, DeSisto C, Kelahan H, Fiorella KJ, Little DC, Allison EH, Fanzo J, Thilsted SH (2021) Aquatic foods to nourish nations. Nature 598: 315-320.
 "afcd_nutrients"
