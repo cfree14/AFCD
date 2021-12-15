@@ -11,6 +11,7 @@ library(tidyverse)
 # Directories
 indir <- "data-raw/raw"
 outdir <- "data-raw/processed"
+plotdir <- "data-raw/figures"
 
 # Resources
 # GitHub: https://github.com/zachkoehn/aquatic_foods_nutrient_database
@@ -28,8 +29,6 @@ ref_peer_orig <- readxl::read_excel(file.path(indir, "afcd_references.xlsx"), sh
 col_key_orig <- readxl::read_excel(file.path(indir, "afcd_variable_codex.xlsx"))
 
 # Lots of work to do here:
-# 3) Fix up species taxonomy and build species key
-# 4) Add common names
 # 5) Fix up country codes and add countries
 # 6) Fix up all the nutrient names, units, descriptions - maybe provide nutrient key
 
@@ -154,12 +153,12 @@ nutr_key_orig <- data1 %>%
 # Export for formatting outside R
 write.csv(nutr_key_orig, file.path(indir, "AFCD_nutrient_key_work.csv"), row.names = F)
 
-# Read formatted key
-nutr_key_use <- readxl::read_excel(file.path(indir, "AFCD_nutrient_key_work.xlsx"))
-
 
 # Step 3. Format data
 ################################################################################
+
+# Read formatted key
+nutr_key_use <- readxl::read_excel(file.path(indir, "AFCD_nutrient_key_work.xlsx"), na="NA")
 
 # Format data some more
 data2 <- data1 %>%
@@ -178,8 +177,6 @@ data2 <- data1 %>%
   # Format production category
   mutate(prod_catg=gsub("_", " ",  prod_catg)) %>%
   # Format I30
-  # BNG = may be West Bengal
-  # GRB
   mutate(iso3=stringr::str_trim(iso3),
          iso3=ifelse(iso3=="", "Not provided", iso3),
          iso3=recode(iso3,
@@ -202,12 +199,13 @@ data2 <- data1 %>%
                      "FAO.infoods.west.africa"="FAO West Africa",
                      "FAO.latinfoods"="FAO Latin America")) %>%
   # Add nutrients
-  left_join(nutr_key_use %>% select(nutrient_orig, nutrient, description, units), by=c("nutrient_orig")) %>%
+  left_join(nutr_key_use, by=c("nutrient_orig")) %>%
+  rename(nutrient_units=units, nutrient_desc=description, nutrient_code_fao=fao_code) %>%
   # Arrange
   select(sciname:taxa_db,
          study_id, peer_review, iso3, fao3,
          prod_catg, food_part, food_prep, food_name, food_name_orig, fct_code_orig, food_id, edible_prop, notes,
-         nutrient_orig, nutrient, description, units, value, everything())
+         nutrient_type, nutrient, nutrient_orig, nutrient_desc, nutrient_code_fao, nutrient_units, value, everything())
 
 
 # Step 4. Inspect data
@@ -253,7 +251,6 @@ sort(unique(data2$fct_code_orig))
 sort(unique(data2$food_name))
 sort(unique(data2$food_name_orig))
 
-
 # Inspect countries
 country_key <- data2 %>%
   # Unique ISOs
@@ -264,118 +261,6 @@ country_key <- data2 %>%
   # Sort
   arrange(iso3)
 
-# Species key
-################################################################################
-
-# Species key 1
-spp_key1 <- data2 %>%
-  # Unique species
-  select(sciname) %>%
-  unique() %>%
-  # Recode species
-  rename(sciname_orig=sciname) %>%
-  mutate(sciname=sciname_orig) %>%
-  # Delete dangling commas
-  mutate(sciname=gsub(",$|_$", "", sciname)) %>%
-  # Delete ugly characters
-  mutate(sciname=gsub("<c2><a0>|<ca>|<c3><8d>", "", sciname)) %>%
-  # Delete synonyms in brackets
-  mutate(sciname=gsub("\\s*\\[[^\\)]+\\]", "", sciname)) %>%
-  # Replace semicolons with commas
-  mutate(sciname=gsub(';', ",", sciname)) %>%
-  # Replace underscore with commas
-  mutate(sciname=gsub(" _ ", ", ", sciname)) %>%
-  # Add period to end of all SPPs
-  mutate(sciname=gsub("spp.", "spp", sciname),
-         sciname=gsub("spp", "spp.", sciname)) %>%
-  # Add period to end of all trailing SPs
-  mutate(sciname=gsub(" sp$", " sp.", sciname)) %>%
-  # Add SPP to end of 1 word groups
-  mutate(nwords=freeR::nwords(sciname)) %>%
-  mutate(sciname=ifelse(nwords==1, paste(sciname, "spp."), sciname)) %>%
-  select(-nwords) %>%
-  # Mark species or group specific
-  mutate(type=ifelse(grepl("spp.|sp.|,|/| x ", sciname), "group", "species")) %>% # x=hybrids, commas/slashes is multiple
-  # Remove blank
-  filter(sciname!="" & !is.na(sciname)) %>%
-  # Remove dangling letters
-  mutate(sciname=gsub(" a\\.", "", sciname)) %>%
-  mutate(sciname=gsub(" l\\.", "", sciname)) %>%
-  mutate(sciname=gsub(" b\\.", "", sciname)) %>%
-  mutate(sciname=gsub(" v\\.", "", sciname)) %>%
-  mutate(sciname=gsub(" c\\.", "", sciname)) %>%
-  mutate(sciname=gsub(" h\\.", "", sciname)) %>%
-  # Fix ones with punctuation
-  mutate(sciname=recode(sciname,
-                        "A. nodosum (r.)"="Ablennes nodosum",
-                        "A. nodosum (s.)"="Ablennes nodosum",
-                        "Amphioctopus fangsiao_"="Amphioctopus fangsiao",
-                        "C. fragile"="Caelorinchus fragile",
-                        "C. mosullensis"="Caelorinchus mosullensis",
-                        "C. capoeta umbla"="Caelorinchus capoeta umbla",
-                        "C. crucian"="Caelorinchus crucian",
-                        "Cystoseira abies-marina"="Treptacantha abies-marina", # hyphen is correct
-                        "Engraulis encrasicolus)"="Engraulis encrasicolus",
-                        "F. vesiculosus"="Farfantepenaeus vesiculosus",
-                        "G. chilensis"="Gadiculus chilensis",
-                        # "Gracilaria bursa-pastoris"="", # hyphen is correct
-                        # "Hydrocharis morsus-ranae"="", # hyphen is correct
-                        "L. graellsii"="Labeo graellsii",
-                        "L. xanthochilus"="Labeo xanthochilus",
-                        "L. bohar"="Labeo bohar",
-                        "M. pyrifera"="Macolor pyrifera",
-                        "M. cephalus"="Macolor cephalus",
-                        "Megaloancistrus aculeatus)"="Megaloancistrus aculeatus",
-                        "Melcertus latisculatus (family penaeidae)"="Melicertus latisulcatus",
-                        "Neomeris van -bosseae"="Neomeris vanbosseae",
-                        "Neomeris van-bosseae"="Neomeris vanbosseae",
-                        "O. aureus"="Oreochromis aureus",
-                        "Oncorhynchus mykiss)"="Oncorhynchus mykiss",
-                        "Oreochromis niloticus (juvenile)"="Oreochromis niloticus",
-                        "Pangasianodon hypophthalmus (juvenile)"="Pangasianodon hypophthalmus",
-                        "Paralichthys oli<ea>aceus"="Paralichthys olivaceus",
-                        "Perca -uviatilis"="Perca fluviatilis",
-                        "Pinirampus pinirampu)"="Pinirampus pirinampu",
-                        "Pseudoplatystoma corruscans)"="Pseudoplatystoma corruscans",
-                        "S. sierra"="Scomberomorus sierra",
-                        "Salmo trutta m. lacustris"="Salmo trutta",
-                        "Sepia o.cinalis"="Sepia officinalis",
-                        "Skeletonema marinoi-dohrnii"="Skeletonema dohrnii",
-                        "Spisula (pseudocardium) sachalinensis"="Spisula sachalinensis",
-                        "Tenualosa ilisha (juvenile)"="Tenualosa ilisha")) %>%
-  # Mark ones with punctuation still
-  mutate(punct=grepl("[[:punct:]]", sciname))
-
-# Inspect species with punctuation - these 3 are correct
-spp_key1 %>% filter(type=="group" & punct==T) %>% pull(sciname) %>% sort()
-
-# Inspect species with more than two words
-
-
-# Identify names to check
-names_to_check1 <- spp_key1 %>% filter(type=="species") %>% pull(sciname)
-# wrong_names1 <- freeR::check_names(names_to_check1)
-
-# Identify names that aren't right
-wrong_names1 <- freeR::check_names(names_to_check1)
-
-# Build suggestions data frame
-spp_suggestions1 <- taxize::gnr_resolve(sci = wrong_names1[1:10], best_match_only=T,  canonical = T, cap_first=T)
-
-# Species key 1
-spp_key2 <- spp_key1 %>%
-  # Add suggested fixes
-  left_join(spp_suggestions1 %>% select(user_supplied_name, matched_name2), by=c("sciname"="user_supplied_name")) %>%
-  # Adopt suggested name
-  mutate(sciname2=ifelse(!is.na(matched_name2), matched_name2, sciname)) %>%
-  # Simplify
-  select(type, sciname_orig, sciname, sciname2)
-
-# Identify names to check
-names_to_check2 <- spp_key2 %>% filter(type=="species") %>% pull(sciname2)
-wrong_names2 <- freeR::check_names(names_to_check2)
-
-
 
 # Export data
 ################################################################################
@@ -384,7 +269,69 @@ wrong_names2 <- freeR::check_names(names_to_check2)
 saveRDS(data2, file=file.path(outdir, "AFCD_data.Rds"))
 
 
+# Nutrient key
+################################################################################
 
+# Build nutrient key
+nutr_key <- data2 %>%
+  # Summarize
+  group_by(nutrient_type, nutrient, nutrient_units, nutrient_code_fao, nutrient_desc) %>%
+  summarize(n=n()) %>%
+  ungroup() %>%
+  # Remover
+  filter(nutrient_type!="Non-nutrient")
+
+# Export data
+saveRDS(nutr_key, file=file.path(outdir, "AFCD_nutrient_key.Rds"))
+
+# Inspect
+freeR::complete(nutr_key)
+
+# Setup theme
+my_theme <-  theme(axis.text=element_text(size=6),
+                   axis.title=element_text(size=8),
+                   legend.text=element_text(size=6),
+                   legend.title=element_text(size=8),
+                   strip.text=element_text(size=8),
+                   plot.title=element_text(size=10),
+                   # Gridlines
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   panel.background = element_blank(),
+                   axis.line = element_line(colour = "black"),
+                   # Legend
+                   legend.background = element_rect(fill=alpha('blue', 0)))
+
+# Plot sample size: fatty acids
+g1 <- ggplot(nutr_key %>% filter(nutrient_type=="Fatty acid"), aes(y=reorder(nutrient,n), x=n)) +
+  facet_grid(nutrient_type~., scales="free_y", space="free_y") +
+  geom_bar(stat="identity") +
+  # Labels
+  labs(x="Number of observations", y="") +
+  # Axis
+  # Theme
+  theme_bw() + my_theme #+
+  # theme(axis.text.y=element_blank())
+g1
+
+# Export
+ggsave(g, filename=file.path(plotdir, "AFCD_nutrient_sample_size_fatty_acids.pdf"),
+       width=8.5, height=11, units="in", dpi=600)
+
+# Plot sample size: fatty acids
+g2 <- ggplot(nutr_key %>% filter(nutrient_type!="Fatty acid"), aes(y=reorder(nutrient,n), x=n)) +
+  facet_grid(nutrient_type~., scales="free_y", space="free_y") +
+  geom_bar(stat="identity") +
+  # Labels
+  labs(x="Number of observations", y="") +
+  # Axis
+  # Theme
+  theme_bw() + my_theme
+g2
+
+# Export
+ggsave(g2, filename=file.path(plotdir, "AFCD_nutrient_sample_size_non_fatty_acids.pdf"),
+       width=8.5, height=11, units="in", dpi=600)
 
 
 
