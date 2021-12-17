@@ -380,6 +380,9 @@ freeR::complete(data_sci2)
 saveRDS(data_sci2, file=file.path(outdir, "AFCD_data_sci.Rds"))
 
 
+# Confirm that the datasets are the right size
+nrow(data_comm) + nrow(data_sci2) == nrow(data_orig)
+
 
 
 
