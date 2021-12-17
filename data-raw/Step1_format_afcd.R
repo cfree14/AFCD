@@ -19,7 +19,7 @@ plotdir <- "data-raw/figures"
 # Nature: https://www.nature.com/articles/s41586-021-03917-1?proof=t%2Btarget%3D#data-availability
 
 # Read data
-data_orig <- read.csv(file.path(indir, "20210914_AFCD.csv"))
+data_orig <- read.csv(file.path(indir, "20210914_AFCD.csv"), na.strings = c("", "NA"))
 
 # Read reference key
 ref_fct_orig <- readxl::read_excel(file.path(indir, "afcd_references.xlsx"), sheet="fct_references")
@@ -27,10 +27,6 @@ ref_peer_orig <- readxl::read_excel(file.path(indir, "afcd_references.xlsx"), sh
 
 # Read column key
 col_key_orig <- readxl::read_excel(file.path(indir, "afcd_variable_codex.xlsx"))
-
-# Lots of work to do here:
-# 5) Fix up country codes and add countries
-# 6) Fix up all the nutrient names, units, descriptions - maybe provide nutrient key
 
 
 # Build reference key
@@ -115,6 +111,9 @@ data1 <- data_orig %>%
   # Reduce to rows with data
   filter(!is.na(value))
 
+# Inspect
+freeR::complete(data1)
+
 
 # Step 2. Build nutrient key
 ################################################################################
@@ -165,9 +164,14 @@ data2 <- data1 %>%
   # Format scientific name
   mutate(sciname=stringr::str_to_sentence(sciname),
          sciname=stringr::str_trim(sciname)) %>%
+  mutate(sciname=recode(sciname,
+                        "Can"="Cancer spp."),
+         sciname=ifelse(sciname=="Etc.", NA, sciname)) %>%
   # Format other taxonomic info
   mutate(across(.cols=kingdom:genus, .fns=stringr::str_to_title),
          across(.cols=kingdom:genus, .fns=stringr::str_trim)) %>%
+  # Format ETC in genus
+  mutate(genus=ifelse(toupper(genus)=="ETC.", NA, genus)) %>%
   # Format taxa database
   mutate(taxa_db=stringr::str_to_upper(taxa_db)) %>%
   # Format food parts
@@ -176,9 +180,13 @@ data2 <- data1 %>%
   mutate(food_prep=gsub("_", " ",  food_prep)) %>%
   # Format production category
   mutate(prod_catg=gsub("_", " ",  prod_catg)) %>%
+  # Add reference type
+  mutate(study_id=ifelse(is.na(study_id), "Not provided in unformatted AFCD", study_id)) %>%
+  left_join(ref_key %>% select(study_id, study_type), by=c("study_id")) %>%
+  mutate(study_type=ifelse(is.na(study_type), "Id not in AFCD reference key", study_type)) %>%
   # Format I30
   mutate(iso3=stringr::str_trim(iso3),
-         iso3=ifelse(iso3=="", "Not provided", iso3),
+         iso3=ifelse(is.na(iso3), "Not provided in unformatted AFCD", iso3),
          iso3=recode(iso3,
                      "SAu"="SAU",
                      "BNG"="IND", # West Bengal which is part of India - study 1407
@@ -195,30 +203,65 @@ data2 <- data1 %>%
                      "unknown"="Unknown",
                      "POL/ AUS"="POL, AUS",
                      "FAO.biodiv3"="FAO Biodiv 3",
-                     "FAO.infoods.ufish1"="FAO Infoods Ufish",
-                     "FAO.infoods.west.africa"="FAO West Africa",
-                     "FAO.latinfoods"="FAO Latin America")) %>%
+                     "FAO.infoods.ufish1"="FAO INFOODS Ufish",
+                     "FAO.infoods.west.africa"="FAO INFOODS West Africa",
+                     "FAO.latinfoods"="FAO Latin Foods")) %>%
+  # Add country
+  mutate(country=countrycode::countrycode(iso3, "iso3c", "country.name")) %>%
+  mutate(country=ifelse(is.na(country), iso3, country),
+         country=recode(country,
+                        "BGD, KHM"="Bangladesh, Cambodia",
+                        "CHN, JPN, KOR"="China, Japan, South Korea",
+                        "CHN, TWN"="China, Taiwan",
+                        "KOR, CHN"="South Korea, China",
+                        "FRA, GBR"="France, Great Britain",
+                        "NOR, FRA, ISL"="Norway, France, Israel",
+                        "POL, AUS"="Poland, Australia")) %>%
   # Add nutrients
   left_join(nutr_key_use, by=c("nutrient_orig")) %>%
   rename(nutrient_units=units, nutrient_desc=description, nutrient_code_fao=fao_code) %>%
+   # Format nutrient units/description
+  mutate(nutrient_units=ifelse(is.na(nutrient_units), "Not provided in unformatted AFCD", nutrient_units),
+         nutrient_desc=ifelse(is.na(nutrient_desc), nutrient, nutrient_desc)) %>%
+  # Fix up scientific names with "includes"
+  mutate(sciname=recode(sciname,
+                        "Includes a mix of species belonging to the astacidae"="Astacidae spp.",
+                        "Includes a mix of species belonging to the ommastrephidae family"="Ommastrephidae spp.",
+                        "Includes a mix of species belonging to the palaemonidae family"="Palaemonidae spp."),
+         sciname=ifelse(grepl("includes", tolower(sciname)), NA, sciname),
+         genus=ifelse(genus=="Includes", NA, genus)) %>%
+  # Format scientific name
+  mutate(sciname_source=ifelse(!is.na(sciname), "Provided",
+                               ifelse(!is.na(genus), "Genus",
+                                      ifelse(!is.na(family), "Family",
+                                             ifelse(!is.na(order), "Order",
+                                                    ifelse(!is.na(food_name), "Food name (English)", "Food name (original)")))))) %>%
+  mutate(sciname=ifelse(sciname_source=="Provided", sciname,
+                               ifelse(sciname_source=="Genus", genus,
+                                      ifelse(sciname_source=="Family", family,
+                                             ifelse(sciname_source=="Order", order,
+                                                    ifelse(sciname_source=="Food name (English)", food_name, food_name_orig)))))) %>%
+  # Rename scientific name columns
+  rename(taxa_name=sciname, taxa_name_source=sciname_source) %>%
   # Arrange
-  select(sciname:taxa_db,
-         study_id, peer_review, iso3, fao3,
+  select(taxa_name, taxa_name_source, kingdom:taxa_db,
+         study_type, study_id, peer_review, iso3, country, fao3,
          prod_catg, food_part, food_prep, food_name, food_name_orig, fct_code_orig, food_id, edible_prop, notes,
-         nutrient_type, nutrient, nutrient_orig, nutrient_desc, nutrient_code_fao, nutrient_units, value, everything())
+         nutrient_type, nutrient, nutrient_orig, nutrient_desc, nutrient_code_fao, nutrient_units, value, everything()) %>%
+  # Remove unimportant columns
+  select(-c(peer_review))
+
+# Inspect scinames with "includes"
+data2 %>%
+  filter(grepl(pattern="includes|Includes", x=taxa_name)) %>% pull(taxa_name) %>% unique() %>% sort()
 
 
 # Step 4. Inspect data
 ################################################################################
 
 # Inspect
-str(data2)
+# str(data2)
 freeR::complete(data2)
-
-# Inspect nutrients
-nutr_key_check <- data2 %>%
-  select(nutrient, units, description) %>%
-  unique()
 
 # Inspect taxa
 table(data2$kingdom)
@@ -236,9 +279,18 @@ table(data2$prod_catg)
 # Inspect edible proportions (should be 0-1)
 range(data2$edible_prop, na.rm=T)
 
+# Inspect nutrient units
+table(data2$nutrient_units)
+
 # Inspect study characteristics
 sort(unique(data2$study_id))
-table(data2$peer_review)
+
+# Check study type vs. peer review
+# Add peer-review back in to make this work
+# table(data2$peer_review)
+# data2 %>%
+#   group_by(study_type, peer_review) %>%
+#   summarize(n=n())
 
 # Study ids not in key
 data2$study_id[!data2$study_id %in% ref_key$study_id] %>% unique() %>% sort()
@@ -248,25 +300,23 @@ ref_key$study_id[!ref_key$study_id %in% data2$study_id] %>% unique() %>% sort()
 
 # Inspect foods
 sort(unique(data2$fct_code_orig))
-sort(unique(data2$food_name))
-sort(unique(data2$food_name_orig))
+sort(unique(data2$food_name)) # terrible
+sort(unique(data2$food_name_orig)) # terrible
 
 # Inspect countries
-country_key <- data2 %>%
-  # Unique ISOs
-  select(iso3) %>%
-  unique() %>%
-  # Add country
-  mutate(country=countrycode::countrycode(iso3, "iso3c", "country.name")) %>%
-  # Sort
-  arrange(iso3)
+sort(unique(data2$iso3))
+sort(unique(data2$country))
+cntry_key <- data2 %>%
+  group_by(iso3, country) %>%
+  summarize(n=n())
+
 
 
 # Export data
 ################################################################################
 
 # Export data
-saveRDS(data2, file=file.path(outdir, "AFCD_data.Rds"))
+saveRDS(data2, file=file.path(outdir, "AFCD_data_pass1.Rds"))
 
 
 # Nutrient key
@@ -275,7 +325,7 @@ saveRDS(data2, file=file.path(outdir, "AFCD_data.Rds"))
 # Build nutrient key
 nutr_key <- data2 %>%
   # Summarize
-  group_by(nutrient_type, nutrient, nutrient_units, nutrient_code_fao, nutrient_desc) %>%
+  group_by(nutrient_type, nutrient, nutrient_units, nutrient_desc, nutrient_code_fao) %>%
   summarize(n=n()) %>%
   ungroup() %>%
   # Remover
@@ -308,14 +358,12 @@ g1 <- ggplot(nutr_key %>% filter(nutrient_type=="Fatty acid"), aes(y=reorder(nut
   geom_bar(stat="identity") +
   # Labels
   labs(x="Number of observations", y="") +
-  # Axis
   # Theme
-  theme_bw() + my_theme #+
-  # theme(axis.text.y=element_blank())
+  theme_bw() + my_theme
 g1
 
 # Export
-ggsave(g, filename=file.path(plotdir, "AFCD_nutrient_sample_size_fatty_acids.pdf"),
+ggsave(g1, filename=file.path(plotdir, "AFCD_nutrient_sample_size_fatty_acids.pdf"),
        width=8.5, height=11, units="in", dpi=600)
 
 # Plot sample size: fatty acids
@@ -324,7 +372,6 @@ g2 <- ggplot(nutr_key %>% filter(nutrient_type!="Fatty acid"), aes(y=reorder(nut
   geom_bar(stat="identity") +
   # Labels
   labs(x="Number of observations", y="") +
-  # Axis
   # Theme
   theme_bw() + my_theme
 g2
