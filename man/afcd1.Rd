@@ -26,7 +26,7 @@ A data frame with the following attributes:
   \item{notes}{Notes}
   \item{nutrient_type}{Nutient type}
   \item{nutrient}{Nutient name}
-  \item{nutrient}{Nutient name, in the raw AFCD}
+  \item{nutrient_orig}{Nutient name, in the raw AFCD}
   \item{nutrient_desc}{Description of nutrient}
   \item{nutrient_units}{Units per 100g of edible food portion}
   \item{value}{Value}
