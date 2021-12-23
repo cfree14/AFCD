@@ -35,13 +35,13 @@ The data were accessed from this [Harvard Dataverse repository](https://datavers
 The data were cleaned by doing the following:
 
 1. Converting from wide to long format to (1) clarify nutrient identity and units and (2) ease plotting and analysis
-2. Filled in missing nutrient information (e.g., missing units)
-3. Harmonized nutrient names and descriptions
-4. Validated and harmonized taxonomic information
-5. Added a harmonized common name corresponding to the scientific name
-6. Built a species taxonomic reference key to reduce columns and enforce consistency
-7. Built a single reference key merging meta-data on FCT and peer-reviewed sources
-8. Carefully harmonized columns across the data and keys
+2. Filling in missing nutrient information (e.g., missing units)
+3. Harmonizing nutrient names and descriptions
+4. Validating and harmonizing taxonomic information
+5. Adding a harmonized common name corresponding to the scientific name
+6. Building a species taxonomic reference key to reduce columns and enforce consistency
+7. Building a single reference key merging meta-data on FCT and peer-reviewed sources
+8. Carefully harmonizing columns across the data and keys
 
 ## Citation
 
